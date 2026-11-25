@@ -1,34 +1,49 @@
-// A working best-game-01 entry (Node 22, standard library only): the game is this directory's
-// game/ folder, plain static files a desktop browser loads offline (game/index.html and its ES
-// modules, no library and no network request), and the program hands it in. It copies game/ and
-// screenshots/ from beside this file to /output and writes /output/dossier.json, the summary the
-// judge reads, with the vendored make.fun library. A starting point, not a winner: Block Dodger, a
-// plain 2D canvas game where a paddle dodges falling blocks and catches coins, with a title screen,
-// score, lives and levels, game over and restart, flat colours and no sound. Build your own game
-// (any genre, any library you vendor under game/, or none), put your 3 or 4 PNG or JPEG screenshots
-// in screenshots/ (the first by name is the cover) and run it.
+// Warung Bakso Malam — night stall cooking simulation game where players prepare
+// and serve traditional Indonesian meatball soup (bakso), noodles, fried snacks,
+// and iced tea to hungry night-market customers against the clock.
 //
-// Serve it locally with `node serve.ts`, then open http://localhost:8080.
-// Outside the grader's container, MAKEFUN_OUTPUT_DIR stands in for /output:
-//   mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts
+// Four screenshot scenes:
+//   1. 1-board.jpg — Order board and night stall exterior overview
+//   2. 2-counter.jpg — Food preparation and ingredient counter station
+//   3. 3-assembly.jpg — Bowl assembly station combining broth, noodles, and meatballs
+//   4. 4-serve.jpg — Serving station and customer satisfaction feedback
+//
+// Build entrypoint (Node 22, standard library only): copies game/ and screenshots/
+// to MAKEFUN_OUTPUT_DIR (default /output) and writes dossier.json using buildDossier.
 
-import { cpSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { buildDossier } from './vendor/makefun-game.ts';
+import { buildDossier, readGameTree } from './vendor/makefun-game.ts';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
 const out = process.env.MAKEFUN_OUTPUT_DIR ?? '/output';
 
+const indexHtmlPath = join(here, 'game', 'index.html');
+if (!existsSync(indexHtmlPath)) {
+  console.error('Error: game/index.html is missing. Warung Bakso Malam build aborted.');
+  process.exit(1);
+}
+
+const srcDir = join(here, 'game', 'src');
+if (!existsSync(srcDir)) {
+  console.error('Error: game/src directory is missing.');
+  process.exit(1);
+}
+
 mkdirSync(out, { recursive: true });
 cpSync(join(here, 'game'), join(out, 'game'), { recursive: true });
-mkdirSync(join(out, 'screenshots'), { recursive: true });
-if (existsSync(join(here, 'screenshots'))) cpSync(join(here, 'screenshots'), join(out, 'screenshots'), { recursive: true });
 
-// The scorer's own caps (reference/gate.json): only text_max_bytes shapes the bytes; the others refuse an entry the
-// scorer would refuse (more than 4 screenshots or one over 256 KiB; more than 993 files in game/ or 48 MiB of game
-// files, in all, or a path under game/ over 1000 bytes: game/ counts beside /output's own 1000-entry cap, its
-// screenshots/ and dossier.json).
+mkdirSync(join(out, 'screenshots'), { recursive: true });
+if (existsSync(join(here, 'screenshots'))) {
+  cpSync(join(here, 'screenshots'), join(out, 'screenshots'), { recursive: true });
+}
+
+const tree = readGameTree(join(out, 'game'));
+const screenshotsCount = existsSync(join(out, 'screenshots'))
+  ? readdirSync(join(out, 'screenshots')).filter((f) => !f.startsWith('.')).length
+  : 0;
+
 writeFileSync(
   join(out, 'dossier.json'),
   buildDossier(out, {
@@ -38,4 +53,8 @@ writeFileSync(
     game_max_bytes: 50331648,
     game_path_max_bytes: 1000,
   }),
+);
+
+console.log(
+  `Warung Bakso Malam build complete: shipped game (${tree.count} entries, ${tree.totalBytes} bytes) and ${screenshotsCount} screenshots to ${out}, wrote dossier.json.`
 );
